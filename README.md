@@ -40,5 +40,6 @@ then open `http://localhost:8765/index.html`.
 
 ## Deployment
 
-Deployed on Vercel, linked to this GitHub repo — pushes to `main`
-auto-deploy.
+Deployed on Vercel. Note: GitHub auto-deploy is not yet connected —
+deploy manually with `vercel --prod` until the Vercel dashboard's
+GitHub connection is set up.

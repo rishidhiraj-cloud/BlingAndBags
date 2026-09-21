@@ -5,8 +5,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Initialize Supabase client
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-console.log('%c✅ Expense.js v20260514-receipts-4-anchor loaded',
-    'background:#16a34a;color:white;padding:4px 8px;border-radius:4px;font-weight:bold');
+console.log('✅ Expense.js loaded');
 
 // Format number in Indian style
 function formatIndianNumber(num) {
@@ -41,20 +40,6 @@ const darkModeToggle = document.getElementById('darkModeToggle');
 const filterExpenseByInput = document.getElementById('filterExpenseBy');
 const totalExpenseEl = document.getElementById('totalExpense');
 
-// Receipt photo elements
-const receiptFileInput = document.getElementById('receiptFile');
-const receiptCaptureBtn = document.getElementById('receiptCaptureBtn');
-const receiptClearBtn = document.getElementById('receiptClearBtn');
-const receiptPreview = document.getElementById('receiptPreview');
-const receiptPreviewGrid = document.getElementById('receiptPreviewGrid');
-const receiptSizeLabel = document.getElementById('receiptSizeLabel');
-const receiptLightbox = document.getElementById('receiptLightbox');
-const receiptLightboxImg = document.getElementById('receiptLightboxImg');
-const receiptLightboxClose = document.getElementById('receiptLightboxClose');
-
-// In-memory: array of { blob, previewUrl } pending upload
-let pendingReceipts = [];
-
 // Get selected month from localStorage or use current month
 function getSelectedMonth() {
     const savedMonth = localStorage.getItem('selectedMonth');
@@ -63,151 +48,6 @@ function getSelectedMonth() {
     }
     return new Date();
 }
-
-// ----- Receipt: compress, preview, clear -----
-async function compressImage(file, maxDim = 1600, quality = 0.85) {
-    // Load file into Image
-    const imgUrl = URL.createObjectURL(file);
-    try {
-        const img = await new Promise((resolve, reject) => {
-            const i = new Image();
-            i.onload = () => resolve(i);
-            i.onerror = () => reject(new Error('Could not read image'));
-            i.src = imgUrl;
-        });
-
-        const ratio = Math.min(maxDim / img.naturalWidth, maxDim / img.naturalHeight, 1);
-        const w = Math.max(1, Math.round(img.naturalWidth * ratio));
-        const h = Math.max(1, Math.round(img.naturalHeight * ratio));
-
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
-        return blob;
-    } finally {
-        URL.revokeObjectURL(imgUrl);
-    }
-}
-
-function renderReceiptPreviews() {
-    receiptPreviewGrid.innerHTML = '';
-    pendingReceipts.forEach((item, idx) => {
-        const div = document.createElement('div');
-        div.className = 'receipt-preview-item';
-
-        const img = document.createElement('img');
-        img.src = item.previewUrl;
-        img.alt = `Receipt ${idx + 1}`;
-        img.addEventListener('click', () => openReceiptLightbox(item.previewUrl));
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'remove-one-btn';
-        removeBtn.textContent = '✕';
-        removeBtn.addEventListener('click', () => removeReceiptAt(idx));
-
-        div.appendChild(img);
-        div.appendChild(removeBtn);
-        receiptPreviewGrid.appendChild(div);
-    });
-
-    const count = pendingReceipts.length;
-    const totalKb = Math.round(pendingReceipts.reduce((s, r) => s + r.blob.size, 0) / 1024);
-    receiptSizeLabel.textContent = count > 0 ? `${count} image${count > 1 ? 's' : ''} · ${totalKb} KB ready to upload` : '';
-
-    if (count > 0) {
-        receiptPreview.classList.remove('hidden');
-        receiptClearBtn.classList.remove('hidden');
-        receiptCaptureBtn.textContent = '📷 Add More Photos';
-    } else {
-        receiptPreview.classList.add('hidden');
-        receiptClearBtn.classList.add('hidden');
-        receiptCaptureBtn.textContent = '📷 Add Receipt Photo(s)';
-    }
-}
-
-function removeReceiptAt(idx) {
-    URL.revokeObjectURL(pendingReceipts[idx].previewUrl);
-    pendingReceipts.splice(idx, 1);
-    receiptFileInput.value = '';
-    renderReceiptPreviews();
-}
-
-function clearPendingReceipt() {
-    pendingReceipts.forEach(r => URL.revokeObjectURL(r.previewUrl));
-    pendingReceipts = [];
-    receiptFileInput.value = '';
-    renderReceiptPreviews();
-}
-
-async function onReceiptFilesChosen(files) {
-    if (!files || files.length === 0) return;
-    receiptCaptureBtn.textContent = 'Processing…';
-    for (const file of Array.from(files)) {
-        if (!/^image\//.test(file.type)) {
-            alert(`${file.name} is not an image and was skipped.`);
-            continue;
-        }
-        try {
-            const blob = await compressImage(file);
-            if (!blob) throw new Error('Compression failed');
-            const previewUrl = URL.createObjectURL(blob);
-            pendingReceipts.push({ blob, previewUrl });
-        } catch (err) {
-            console.error('Receipt processing failed:', err);
-            alert(`Could not process ${file.name}: ${err.message}`);
-        }
-    }
-    renderReceiptPreviews();
-}
-
-async function uploadReceipt(blob) {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const rand = Math.random().toString(36).slice(2, 8);
-    const fileName = `receipt_${stamp}_${rand}.jpg`;
-
-    const { error: uploadError } = await supabaseClient
-        .storage
-        .from('receipts')
-        .upload(fileName, blob, { contentType: 'image/jpeg', upsert: false });
-    if (uploadError) throw uploadError;
-
-    const { data: pub } = supabaseClient.storage.from('receipts').getPublicUrl(fileName);
-    return pub.publicUrl;
-}
-
-// Lightbox view
-function openReceiptLightbox(url) {
-    if (!url) {
-        console.warn('[lightbox] no url provided');
-        return;
-    }
-    console.log('[lightbox] opening', url);
-    receiptLightboxImg.onload = () => {
-        console.log('[lightbox] image loaded',
-            receiptLightboxImg.naturalWidth, 'x', receiptLightboxImg.naturalHeight);
-    };
-    receiptLightboxImg.onerror = (e) => {
-        console.error('[lightbox] image failed to load:', url, e);
-    };
-    receiptLightboxImg.src = url;
-    receiptLightbox.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-}
-function closeReceiptLightbox() {
-    receiptLightbox.classList.add('hidden');
-    receiptLightboxImg.src = '';
-    document.body.style.overflow = '';
-}
-window.viewReceipt = openReceiptLightbox;
 
 // Initialize App
 function init() {
@@ -244,27 +84,6 @@ function init() {
                 });
             }
         });
-    });
-
-    // Receipt photo wiring
-    if (receiptFileInput) {
-        receiptFileInput.addEventListener('change', (e) => {
-            onReceiptFilesChosen(e.target.files);
-        });
-    }
-    if (receiptClearBtn) {
-        receiptClearBtn.addEventListener('click', clearPendingReceipt);
-    }
-    if (receiptLightboxClose) {
-        receiptLightboxClose.addEventListener('click', closeReceiptLightbox);
-    }
-    if (receiptLightbox) {
-        receiptLightbox.addEventListener('click', (e) => {
-            if (e.target === receiptLightbox) closeReceiptLightbox();
-        });
-    }
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeReceiptLightbox();
     });
 
     // Load expense history
@@ -328,32 +147,13 @@ async function handleSubmit(e) {
             return;
         }
 
-        // If receipt photos were selected, upload them FIRST so we can store the URLs.
-        // Done before the row insert so a failed upload doesn't leave a dangling row.
-        let receiptUrl = null;
-        if (pendingReceipts.length > 0) {
-            submitBtn.textContent = 'Uploading receipt…';
-            try {
-                const urls = await Promise.all(pendingReceipts.map(r => uploadReceipt(r.blob)));
-                receiptUrl = urls.length === 1 ? urls[0] : JSON.stringify(urls);
-                console.log('🧾 Receipt(s) uploaded:', receiptUrl);
-            } catch (uErr) {
-                console.error('Receipt upload failed:', uErr);
-                showStatusMessage('Receipt upload failed: ' + uErr.message + ' (expense not saved)', 'error');
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Save Expense';
-                return;
-            }
-        }
-
         // Prepare data object
         const expenseData = {
             expense_date: expenseDate,
             expense_by: expenseBy,
             amount: amount,
             paid_from: paidFrom,
-            description: description || null,
-            receipt_url: receiptUrl
+            description: description || null
         };
 
         console.log('Inserting expense:', expenseData);
@@ -373,9 +173,8 @@ async function handleSubmit(e) {
         console.log('✅ INSERT SUCCESS!');
         showStatusMessage('Expense saved successfully!', 'success');
 
-        // Clear form (including the pending receipt)
+        // Clear form
         form.reset();
-        clearPendingReceipt();
         expenseDateInput.value = new Date().toISOString().split('T')[0];
 
         // Reload history
@@ -517,21 +316,6 @@ function displayExpenses(expenses) {
                         <span class="expense-value">${expense.description}</span>
                     </div>
                     ` : ''}
-                    ${expense.receipt_url ? (() => {
-                        let urls;
-                        try { urls = JSON.parse(expense.receipt_url); if (!Array.isArray(urls)) urls = [expense.receipt_url]; }
-                        catch { urls = [expense.receipt_url]; }
-                        return `<div class="expense-detail-row receipt-row">
-                        <span class="expense-label">Receipt:</span>
-                        <div class="receipt-thumbs">
-                            ${urls.map((url, i) => `
-                            <a href="${url}" target="_blank" rel="noopener" class="receipt-thumb-link" title="Open receipt ${urls.length > 1 ? i + 1 : ''}">
-                                <img class="receipt-thumb" src="${url}" alt="Receipt${urls.length > 1 ? ' ' + (i+1) : ''}" onerror="this.closest('.receipt-thumb-link').style.display='none'">
-                                <span class="receipt-open-hint">↗ Open</span>
-                            </a>`).join('')}
-                        </div>
-                    </div>`;
-                    })() : ''}
                 </div>
                 ${actionsHtml}
             </div>
@@ -539,8 +323,6 @@ function displayExpenses(expenses) {
     }).join('');
 
     expenseHistoryEl.innerHTML = expensesHTML;
-    // Thumbnails are wrapped in <a target="_blank"> so clicking is handled
-    // natively by the browser — no JS click listener needed.
 }
 
 // Display No Expenses Message
@@ -653,29 +435,6 @@ window.deleteExpense = async function(expenseId) {
     console.log('deleteExpense called with ID:', expenseId);
 
     try {
-        // Best-effort cleanup of any attached receipt image(s) in Storage
-        // before deleting the row, so we know the file name(s) to remove.
-        const { data: expense, error: fetchError } = await supabaseClient
-            .from('expenses')
-            .select('receipt_url')
-            .eq('id', expenseId)
-            .single();
-
-        if (!fetchError && expense && expense.receipt_url) {
-            let urls;
-            try {
-                urls = JSON.parse(expense.receipt_url);
-                if (!Array.isArray(urls)) urls = [expense.receipt_url];
-            } catch {
-                urls = [expense.receipt_url];
-            }
-            const fileNames = urls.map(u => u.split('/receipts/').pop()).filter(Boolean);
-            if (fileNames.length) {
-                const { error: rmErr } = await supabaseClient.storage.from('receipts').remove(fileNames);
-                if (rmErr) console.warn('Receipt cleanup error:', rmErr);
-            }
-        }
-
         const { error } = await supabaseClient
             .from('expenses')
             .delete()

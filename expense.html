@@ -42,14 +42,7 @@
                 <a href="entry.html" data-num="01">New Entry</a>
                 <a href="history.html" data-num="02">History</a>
                 <a href="expense.html" data-num="03">Expenses</a>
-                <a href="rent_income.html" data-num="04">Rent Income</a>
-                <a href="statement.html" data-num="05">Statement</a>
-                <a href="storage.html" data-num="06">Manage Storage</a>
-                <a href="outofstock.html" data-num="07">Out of Stock</a>
-                <a href="passport_photo_generator.html" data-num="08">Passport Photo</a>
-                <a href="collage.html" data-num="09">Collage</a>
-                <a href="generate_bill.html" data-num="10">Generate Bill</a>
-                <a href="sales_log.html" data-num="11">Sales Log</a>
+                <a href="statement.html" data-num="04">Statement</a>
                 <button id="darkModeToggle" class="dark-mode-toggle-btn">🌙 Dark Mode</button>
             </nav>
         </div>
@@ -128,24 +121,6 @@
                                   placeholder="Enter expense details..."></textarea>
                     </div>
 
-                    <!-- Receipt Photo -->
-                    <div class="form-group">
-                        <label>Receipt Photo <span class="optional-hint">(optional)</span></label>
-                        <div class="receipt-capture-row">
-                            <label for="receiptFile" class="receipt-capture-btn" id="receiptCaptureBtn">
-                                📷 Add Receipt Photo(s)
-                            </label>
-                            <input type="file" id="receiptFile" accept="image/*" multiple hidden>
-                            <button type="button" id="receiptClearBtn" class="receipt-clear-btn hidden">✕ Remove All</button>
-                        </div>
-                        <div id="receiptPreview" class="receipt-preview hidden">
-                            <div id="receiptPreviewGrid" class="receipt-preview-grid"></div>
-                            <div class="receipt-preview-meta">
-                                <span id="receiptSizeLabel"></span>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Submit Button -->
                     <button type="submit" class="btn-primary" id="submitBtn">
                         Save Expense
@@ -178,18 +153,12 @@
                 </div>
             </div>
         </main>
-
-        <!-- Receipt Lightbox -->
-        <div id="receiptLightbox" class="receipt-lightbox hidden">
-            <button class="receipt-lightbox-close" id="receiptLightboxClose" aria-label="Close">✕</button>
-            <img id="receiptLightboxImg" alt="Receipt">
-        </div>
     </div>
 
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="auth.js"></script>
-    <script src="expense.js?v=20260514-receipts-4-anchor"></script>
+    <script src="expense.js?v=1"></script>
     <!-- Vercel Speed Insights -->
     <script>
         window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
