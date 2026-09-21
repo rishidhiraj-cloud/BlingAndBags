@@ -112,7 +112,7 @@ function calculateAllFields() {
     const cashTotal = cash - yesterdayPettyCash;
     cashTotalInput.value = cashTotal.toFixed(2);
 
-    // Calculate Petty Cash Amount = Cash Amount - AP Cash
+    // Calculate Petty Cash Amount = Cash Amount - Saving Cash
     const pettyCash = cash - savingCash;
     pettyCashAmountInput.value = pettyCash.toFixed(2);
 

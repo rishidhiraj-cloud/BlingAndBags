@@ -256,7 +256,7 @@ body.dark-mode .header-greeting {
 .burger-menu.active { left: 0; }
 
 .burger-menu::before {
-    content: 'Pen & Play Club';
+    content: 'Bling & Bags';
     font-family: var(--serif);
     font-size: 20px;
     font-weight: 600;
