@@ -21,9 +21,10 @@ dashboard, deployed on Vercel. No build step, no framework.
 | `index.html`, `dashboard.js`, `dashboard-style.css` | Dashboard: month selector, income charts, trends |
 | `entry.html`, `app.js`, `style.css` | Daily cash register entry (Cash / UPI / Card / Saving Cash) |
 | `history.html`, `history.js`, `history-style.css` | View/edit/delete past daily entries |
-| `expense.html`, `expense.js`, `expense-style.css` | Expense tracking |
+| `expense.html`, `expense.js`, `expense-style.css` | Expense tracking, incl. reimbursement sub-feature |
 | `statement.html`, `statement.js`, `statement-style.css` | Financial statement view |
-| `README.md`, `.gitignore`, `run.command`, icons/logo | Supporting project files |
+| `auth.js` | Login gate (name + shared passkey) loaded by all five pages above |
+| `README.md`, `.gitignore`, `run.command`, `package.json`, icons/logo | Supporting project files |
 
 **Out of scope** (present in TestVibe, not carried over): storage/
 inventory, out-of-stock tracking, sales log, bill generation, rent
@@ -36,8 +37,14 @@ scoped additions if Bling & Bags needs them.
 Applied consistently across all ported files:
 
 - Shop name: **"Bling & Bags"** in titles, headers, PWA manifest, icons
-- Logo: user-supplied logo image (pink/gold boutique branding),
-  replacing TestVibe's `Logo.png` / icon files
+- Logo: user-supplied logo image (pink/gold boutique branding), saved
+  to `logo.png` in the project root, used to generate `Logo.png`
+  (body/header logo) plus resized icon files matching TestVibe's exact
+  set: `icon-192.png`, `icon-512.png`, `apple-touch-icon-180.png`
+  (generated with macOS's built-in `sips` tool — no ImageMagick
+  available in this environment). No PWA manifest file exists in
+  TestVibe to update; icons are referenced only via `<link>` tags in
+  each page's `<head>`.
 - Expense "spent by" list: **Dhiraj, Pallavi** (was Abhishek, Neha,
   Priyanka, Dhiraj)
 - **"AP Cash" → "Saving Cash"** everywhere: the daily-entry field
@@ -54,14 +61,31 @@ Applied consistently across all ported files:
 - Supabase credentials: hardcoded per-file (URL + anon key repeated in
   `app.js`, `history.js`, `expense.js`, `statement.js`, `dashboard.js`),
   mirroring TestVibe's existing pattern exactly — no shared config file
+- `auth.js` login gate: same shared-passkey mechanism, **passkey stays
+  `7486`** (reused as-is). `USERS` list becomes `['Dhiraj', 'Pallavi']`.
+  The Rohit-specific role-restriction logic (`enforceRoleAccess`,
+  `ROHIT_ALLOWED`, redirect-to-passport-photo-page) is dead code with
+  no target pages in this scope — stripped during the port, not carried
+  over. Login overlay brand text "Pen & Play Club" → "Bling & Bags".
+- Expense reimbursement sub-feature (mark an expense "Reimbursed",
+  which auto-creates a new `paid_from: 'Bank'` expense entry recording
+  the payback) is **included**, adapted from TestVibe's
+  `expense_reimbursement_migration.sql` + the `markAsReimbursed()`
+  logic in `expense.js`. One behavior change from TestVibe: the
+  auto-created reimbursement entry's `expense_by` is set **dynamically
+  to whoever filed the original expense** (`originalExpense.expense_by`)
+  instead of TestVibe's hardcoded `'Neha'` — this is a deliberate fix,
+  not a straight port, since a fixed name made little sense with a
+  2-person team.
 
 ## Database (new Supabase project, same Supabase account)
 
 Project URL: `https://khcwfivaxwgetwcrbefd.supabase.co` (already
 created by user; anon key provided separately, not stored in this doc).
 
-Two tables, adapted from TestVibe's `daily_entries` and
-`CREATE_EXPENSES_TABLE.sql`:
+Two tables, matching TestVibe's actual column names exactly (verified
+against its live `app.js`/`expense.js`, not just its README) except
+for the `ap_cash` → `saving_cash` rename:
 
 ```sql
 CREATE TABLE daily_entries (
@@ -71,27 +95,41 @@ CREATE TABLE daily_entries (
     upi_amount DECIMAL(10, 2) NOT NULL,
     card_amount DECIMAL(10, 2) NOT NULL,
     saving_cash DECIMAL(10, 2) NOT NULL,   -- renamed from ap_cash
+    cash_total DECIMAL(10, 2) NOT NULL,
     petty_cash DECIMAL(10, 2) NOT NULL,
     total_income DECIMAL(10, 2) NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX idx_daily_entries_date ON daily_entries(date DESC);
+ALTER TABLE daily_entries DISABLE ROW LEVEL SECURITY;
 
 CREATE TABLE expenses (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    date DATE NOT NULL,
+    expense_date DATE NOT NULL,
+    expense_by VARCHAR(50) NOT NULL,      -- 'Dhiraj' | 'Pallavi'
     amount DECIMAL(10, 2) NOT NULL,
+    paid_from VARCHAR(20) NOT NULL,       -- 'Bank' | 'Saving Cash' | 'Self'
     description TEXT,
-    spent_by TEXT NOT NULL,      -- 'Dhiraj' | 'Pallavi'
-    paid_from TEXT NOT NULL,     -- 'Bank' | 'Saving Cash' | 'Self'
+    reimbursed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT NOW()
 );
-CREATE INDEX idx_expenses_date ON expenses(date DESC);
+CREATE INDEX idx_expenses_date ON expenses(expense_date DESC);
+CREATE INDEX idx_expenses_by ON expenses(expense_by);
+CREATE INDEX idx_expenses_reimbursed ON expenses(reimbursed);
+ALTER TABLE expenses DISABLE ROW LEVEL SECURITY;
 ```
 
-Row Level Security: same policy shape TestVibe uses in
-`FIX_RLS.sql`/`SUPABASE_FIX.sql` (anon key allowed to read/write these
-two tables).
+Row Level Security: TestVibe actually runs both tables with **RLS
+disabled entirely** (verified in `FIX_RLS.sql`/`CREATE_EXPENSES_TABLE.sql`
+— there are no enforced policies, despite the README mentioning RLS as
+a "production" recommendation it never adopted). Bling & Bags matches
+that same baseline: RLS off, anon key can read/write freely. No change
+in security posture from TestVibe.
+
+Opening balances: TestVibe's `statement.js` seeds real historical
+figures for Pen & Play (`SEED_OPENING = {'BoB': 122965.09, 'AP Cash':
+-65662.00}`). Bling & Bags has no transaction history, so its
+equivalent seed is `{'BoB': 0, 'Saving Cash': 0}`.
 
 ## Repository & deployment
 
@@ -101,6 +139,11 @@ two tables).
   environment); this project's local git repo is then pushed to it.
 - New Vercel project (separate from TestVibe's `pen-and-play`), linked
   to the new GitHub repo, created after the initial push.
+
+Note: TestVibe's `run.command` (local dev launcher) hardcodes a path
+to `passport_photo_generator.html`, which is out of scope here. Bling &
+Bags gets a simplified version that just serves the project root over
+`python3 -m http.server` and opens `index.html`.
 
 ## Explicitly deferred
 
