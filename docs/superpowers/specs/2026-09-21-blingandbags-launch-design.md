@@ -46,9 +46,8 @@ Applied consistently across all ported files:
   are unchanged, only renamed:
   - `Petty Cash = Cash − Saving Cash`
   - `Total Income = Cash + UPI + Card − Yesterday's Petty Cash`
-- Bank account label "BoB" (Bank of Baroda) — **assumed unchanged**
-  pending confirmation; if Bling & Bags uses a different bank, this
-  label needs to change too (see open question below)
+- Bank account label "BoB" (Bank of Baroda) stays as-is — confirmed
+  same bank account used
 - Visual theme (colors, fonts, layout): **unchanged** from TestVibe —
   only branding text/logo swapped in, per explicit decision to reuse
   the existing look
@@ -102,11 +101,6 @@ two tables).
   environment); this project's local git repo is then pushed to it.
 - New Vercel project (separate from TestVibe's `pen-and-play`), linked
   to the new GitHub repo, created after the initial push.
-
-## Open questions
-
-- Does Bling & Bags use the same bank account as Pen & Play (so the
-  "BoB" label is accurate), or a different bank (label needs updating)?
 
 ## Explicitly deferred
 
