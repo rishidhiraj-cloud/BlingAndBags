@@ -12,7 +12,7 @@ console.log('✅ Statement.js loaded successfully');
 const SEED_YEAR = 2026;
 const SEED_MONTH_INDEX = 8; // September (0-indexed)
 const SEED_OPENING = {
-    'BoB':    0,
+    'BoB':    2041,
     'Saving Cash': 0
 };
 
